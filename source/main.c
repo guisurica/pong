@@ -17,6 +17,7 @@
 #define AI_QUADRANT_MULTPLIER 3
 #define PLAYER_QUADRANT_MULTIPLIER 1
 #define MENU_ITEMS_LENGTH 3
+#define SOUNDS 5
 
 Vector2 ball_position = { SCREEN_WIDTH/2 - BALL_SIZE / 2, SCREEN_HEIGHT / 2 };
 Vector2 ball_speed    = { BALL_SPEED, BALL_SPEED };
@@ -55,6 +56,16 @@ int pause = 1;
 int player_paddle_touched = 1;
 int spawn_delay = SPAWN_DELAY;
 enum GAME_MODE game_mode_selected = AI;
+Sound soundArray[SOUNDS] = { 0 };
+
+static void load_sounds_array() 
+{
+    soundArray[0] = LoadSound("assets/sounds/menu_select.wav");
+    soundArray[1] = LoadSound("assets/sounds/paddle_bump1.wav");
+    soundArray[2] = LoadSound("assets/sounds/paddle_bump2.wav");
+    soundArray[3] = LoadSound("assets/sounds/paddle_limit.wav");
+    soundArray[4] = LoadSound("assets/sounds/scoring.wav");
+}
 
 static void show_menu() 
 {
@@ -70,17 +81,19 @@ static void show_menu()
         if (IsKeyDown(KEY_KP_1)) 
         {
             game_mode_selected = AI;
+            PlaySound(soundArray[0]);
             pause = 0;
         } 
         else if (IsKeyDown(KEY_KP_2)) 
         {
             game_mode_selected = LOCAL;
+            PlaySound(soundArray[0]);
             pause = 0;
         } 
         else if (IsKeyDown(KEY_KP_3)) 
         {
             game_mode_selected = ONLINE;
-            pause = 0;
+            PlaySound(soundArray[0]);
         }
 
         DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
@@ -109,6 +122,7 @@ static void left_paddle_score(float current_ball_position)
 {
     if (current_ball_position < 0) 
     {
+        PlaySound(soundArray[4]);
         paddle_left_score++;
 
         restart_paddle_position(&paddle_left, paddle_left_position);
@@ -122,6 +136,7 @@ static void right_paddle_score(float current_ball_position)
 {
     if (current_ball_position + BALL_SIZE > GetScreenWidth()) 
     {
+        PlaySound(soundArray[4]);
         paddle_right_score++;
         
         restart_paddle_position(&paddle_left, paddle_left_position);
@@ -168,7 +183,7 @@ char *get_game_mode(enum GAME_MODE mode)
 
 int main(void) 
 {
-    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pong by Gsuc");
+    InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Pong por Gsuc");
         
     paddle_left.height = PADDLE_HEIGHT;
     paddle_left.width = PADDLE_LENGTH;
@@ -206,6 +221,8 @@ int main(void)
     AIDetectRecDownPlayerQuadrant.y = GetScreenHeight() / 2;
 
     InitAudioDevice();
+
+    load_sounds_array();
 
     SetTargetFPS(60);
 
@@ -284,12 +301,14 @@ int main(void)
                 {
                     ball_speed.x = -ball_v_x;
                     player_paddle_touched = 0;
+                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]);
                 }
         
                 if (paddle_left_collision == 1)
                 {
                     ball_speed.x = ball_v_x * 8;
                     player_paddle_touched = 1;
+                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]);
                 }
 
                 if (game_mode_selected == AI) 
