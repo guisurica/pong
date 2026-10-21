@@ -4,8 +4,6 @@
 
 #include "raylib.h"
 
-// TODO: Separar codigo por interfaces
-
 // TODO: Melhorar organização do código
 
 #define BALL_SIZE      50
@@ -42,10 +40,10 @@ enum GAME_MODE {
     ONLINE
 };
  
-// TODO: implementar modos de jogo
+// TODO: Implementar modo de jogo online
 char *items[] = {
     "Você vs IA [1]",
-    "Você vs jogador (local) [Em desenvolvimento!] [2]",
+    "Você vs jogador (local) [2]",
     "Você vs jogador (online) [Em desenvolvimento!] [3]",
 };
 
@@ -58,8 +56,108 @@ int player_paddle_touched = 1;
 int spawn_delay = SPAWN_DELAY;
 enum GAME_MODE game_mode_selected = AI;
 
-char *get_game_mode(enum GAME_MODE mode) {
-    switch(mode) {
+static void show_menu() 
+{
+    if (pause == 1) 
+    {
+        ClearBackground(WHITE);
+
+        for(int i = 0; i < MENU_ITEMS_LENGTH; ++i) 
+        {
+            DrawText(menu_items[i], GetScreenWidth() / 3 - PADDING_TEXT * 3, GetScreenHeight() / 2 + PADDING_TEXT * i + 3, 32, BLACK);
+        }
+
+        if (IsKeyDown(KEY_KP_1)) 
+        {
+            game_mode_selected = AI;
+            pause = 0;
+        } 
+        else if (IsKeyDown(KEY_KP_2)) 
+        {
+            game_mode_selected = LOCAL;
+            pause = 0;
+        } 
+        else if (IsKeyDown(KEY_KP_3)) 
+        {
+            game_mode_selected = ONLINE;
+            pause = 0;
+        }
+
+        DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
+    }
+}
+
+static void show_score() 
+{
+    DrawText(TextFormat("%00i", paddle_left_score), GetScreenWidth() / 2 - 18 + PADDING_TEXT, PADDING_TEXT * 0.5, 72, WHITE);
+    DrawText(TextFormat("%00i", paddle_right_score), GetScreenWidth() / 2 - 18 - PADDING_TEXT, PADDING_TEXT * 0.5, 72, WHITE);
+}
+
+static void restart_paddle_position(struct Rectangle *pPaddle, Vector2 position) 
+{
+    pPaddle->x = position.x;
+    pPaddle->y = position.y;
+}
+
+static void restart_ball_position(struct Rectangle *pBall, Vector2 position) 
+{
+    pBall->x = position.x;
+    pBall->y = position.y;
+}
+
+static void left_paddle_score(float current_ball_position) 
+{
+    if (current_ball_position < 0) 
+    {
+        paddle_left_score++;
+
+        restart_paddle_position(&paddle_left, paddle_left_position);
+        restart_paddle_position(&paddle_right, paddle_right_position);
+
+        restart_ball_position(&ball, ball_position);
+    }
+}
+
+static void right_paddle_score(float current_ball_position) 
+{
+    if (current_ball_position + BALL_SIZE > GetScreenWidth()) 
+    {
+        paddle_right_score++;
+        
+        restart_paddle_position(&paddle_left, paddle_left_position);
+        restart_paddle_position(&paddle_right, paddle_right_position);
+
+        restart_ball_position(&ball, ball_position);
+    }
+}
+
+static int check_ball_wall_collision(float current_ball_position, int screen_height) 
+{
+    if (current_ball_position < 0 || current_ball_position + BALL_SIZE >= screen_height) 
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+static void bounce_ball(float current_ball_position, int screen_height, 
+    struct Rectangle *pBall, Vector2 *pBall_speed) 
+{
+    if (check_ball_wall_collision(current_ball_position, screen_height) == 1) 
+    {
+        pBall_speed->y = -pBall_speed->y;
+    } 
+    else 
+    {
+        pBall->y = current_ball_position;
+    }
+}
+
+char *get_game_mode(enum GAME_MODE mode) 
+{
+    switch(mode) 
+    {
         case AI: return "Contra IA";
         case LOCAL: return "Local";
         case ONLINE: return "online";
@@ -112,130 +210,124 @@ int main(void)
     SetTargetFPS(60);
 
     while(!WindowShouldClose()) {
-        if (pause == 0) {
+        if (pause == 0) 
+        {
             spawn_delay -= 1;
         }
 
-        if (spawn_delay < 0) {
-            if (pause == 0) {
+        if (IsKeyPressed(KEY_SPACE) && pause == 0) 
+        {
+            pause = 1;
+        } 
+        else if (IsKeyPressed(KEY_SPACE) && pause == 1) 
+        {
+            pause = 0;
+        }
+
+        if (pause == 1 && IsKeyPressed(KEY_R)) 
+        {
+            ball.x = ball_position.x;
+            ball.y = ball_position.y;
+
+            paddle_left.y = paddle_left_position.y;
+            paddle_right.y = paddle_right_position.y;
+
+            paddle_left_score = 0;
+            paddle_right_score = 0;
+
+            pause = 0;
+
+            spawn_delay = SPAWN_DELAY;
+        }
+
+        if (spawn_delay < 0) 
+        {
+            if (pause == 0) 
+            {
                 float ball_v_x = ball_v_x = ball.x + ball_speed.x * GetFrameTime();
                 float ball_v_y = ball_v_y = ball.y + ball_speed.y * GetFrameTime();
         
                 ball.x = ball_v_x;
         
-                if (ball_v_x < 0) {
-                    paddle_left_score++;
-
-                    paddle_left.x = paddle_left_position.x;
-                    paddle_left.y = paddle_left_position.y;
-
-                    paddle_right.x = paddle_right_position.x;
-                    paddle_right.y = paddle_right_position.y;
-
-                    ball.x = ball_position.x;
-                    ball.y = ball_position.y;
-                } 
+                left_paddle_score(ball_v_x);
+                right_paddle_score(ball_v_x);
         
-                if (ball_v_x + BALL_SIZE > GetScreenWidth()) {
-                    paddle_right_score++;
-
-                    paddle_left.x = paddle_left_position.x;
-                    paddle_left.y = paddle_left_position.y;
-
-                    paddle_right.x = paddle_right_position.x;
-                    paddle_right.y = paddle_right_position.y;
-
-                    ball.x = ball_position.x;
-                    ball.y = ball_position.y;
-                }
+                bounce_ball(ball_v_y, GetScreenHeight(), &ball, &ball_speed);
                 
-                if (ball_v_y < 0 || ball_v_y + BALL_SIZE >= GetScreenHeight()) {
-                    ball_speed.y = -ball_speed.y;
-                } else {
-                    ball.y = ball_v_y;
-                }
-                
-                if (paddle_right.y >= (GetScreenHeight() - PADDLE_HEIGHT)) {
+                if (paddle_right.y >= (GetScreenHeight() - PADDLE_HEIGHT)) 
+                {
                     paddle_right.y = GetScreenHeight() - PADDLE_HEIGHT;
                 }
                 
-                if (paddle_right.y <= 0) {
+                if (paddle_right.y <= 0) 
+                {
                     paddle_right.y = 0;
                 }
         
-                if (paddle_left.y >= (GetScreenHeight() - PADDLE_HEIGHT)) {
+                if (paddle_left.y >= (GetScreenHeight() - PADDLE_HEIGHT)) 
+                {
                     paddle_left.y = GetScreenHeight() - PADDLE_HEIGHT;
                 }
         
-                if (paddle_left.y <= 0) {
+                if (paddle_left.y <= 0) 
+                {
                     paddle_left.y = 0;
                 }
-        
+
                 if (IsKeyDown(KEY_W)) paddle_left.y -= (BALL_SPEED * 2) * GetFrameTime(); 
                 if (IsKeyDown(KEY_S)) paddle_left.y += (BALL_SPEED * 2) * GetFrameTime();
 
-                // TODO: Melhorar inputs do usuário
-        
-                // if (IsKeyDown(KEY_KP_2)) paddle_right.y += (BALL_SPEED * 2) * GetFrameTime(); 
-                // if (IsKeyDown(KEY_KP_8)) paddle_right.y -= (BALL_SPEED * 2) * GetFrameTime(); 
-
                 int paddle_left_collision = CheckCollisionRecs(ball, paddle_left);
                 int paddle_right_collision = CheckCollisionRecs(ball, paddle_right);
-                
-                // TODO: Melhorar IA
 
-                int detect_collision_upaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecUpAiQuadrant);
-                int detect_collision_downaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecDownAiQuadrant);
-                int detect_collision_upaward_player_quadrant = CheckCollisionRecs(ball, AIDetectRecUpPlayerQuadrant);
-                int detect_collision_downaward_player_quadrant = CheckCollisionRecs(ball, AIDetectRecDownPlayerQuadrant);
-                
-                if (paddle_right_collision == 1) {
+                if (paddle_right_collision == 1) 
+                {
                     ball_speed.x = -ball_v_x;
                     player_paddle_touched = 0;
                 }
         
-                if (paddle_left_collision == 1) {
+                if (paddle_left_collision == 1)
+                {
                     ball_speed.x = ball_v_x * 8;
                     player_paddle_touched = 1;
                 }
 
-                if (detect_collision_upaward_ai_quadrant == 1) {
-                    paddle_right.y -= BALL_SPEED * AI_QUADRANT_MULTPLIER * GetFrameTime();
+                if (game_mode_selected == AI) 
+                {
+                    int detect_collision_upaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecUpAiQuadrant);
+                    int detect_collision_downaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecDownAiQuadrant);
+                    int detect_collision_upaward_player_quadrant = CheckCollisionRecs(ball, AIDetectRecUpPlayerQuadrant);
+                    int detect_collision_downaward_player_quadrant = CheckCollisionRecs(ball, AIDetectRecDownPlayerQuadrant);
+
+                    if (detect_collision_upaward_ai_quadrant == 1) 
+                    {
+                        paddle_right.y -= BALL_SPEED * AI_QUADRANT_MULTPLIER * GetFrameTime();
+                    }
+
+                    if (detect_collision_downaward_ai_quadrant == 1) 
+                    {
+                        paddle_right.y += BALL_SPEED * AI_QUADRANT_MULTPLIER * GetFrameTime();
+                    }
+
+                    if (detect_collision_upaward_player_quadrant == 1) 
+                    {
+                        paddle_right.y -= BALL_SPEED * PLAYER_QUADRANT_MULTIPLIER * GetFrameTime();
+                    }
+
+                    if (detect_collision_downaward_player_quadrant == 1) 
+                    {
+                        paddle_right.y += BALL_SPEED * PLAYER_QUADRANT_MULTIPLIER * GetFrameTime();
+                    }
                 }
-
-                if (detect_collision_downaward_ai_quadrant == 1) {
-                    paddle_right.y += BALL_SPEED * AI_QUADRANT_MULTPLIER * GetFrameTime();
+                else if (game_mode_selected == LOCAL) 
+                {
+                    if (IsKeyDown(KEY_KP_2)) paddle_right.y += (BALL_SPEED * 2) * GetFrameTime(); 
+                    if (IsKeyDown(KEY_KP_8)) paddle_right.y -= (BALL_SPEED * 2) * GetFrameTime(); 
                 }
+                else if (game_mode_selected == ONLINE) 
+                {
 
-                if (detect_collision_upaward_player_quadrant == 1) {
-                    paddle_right.y -= BALL_SPEED * PLAYER_QUADRANT_MULTIPLIER * GetFrameTime();
                 }
-
-                if (detect_collision_downaward_player_quadrant == 1) {
-                    paddle_right.y += BALL_SPEED * PLAYER_QUADRANT_MULTIPLIER * GetFrameTime();
-                }
-
-            }
-
-            if (IsKeyPressed(KEY_SPACE) && pause == 0) {
-                pause = 1;
-            } else if (IsKeyPressed(KEY_SPACE) && pause == 1) {
-                pause = 0;
-            }
-    
-            if (pause == 1 && IsKeyPressed(KEY_R)) {
-                ball.x = ball_position.x;
-                ball.y = ball_position.y;
-    
-                paddle_left.y = paddle_left_position.y;
-                paddle_right.y = paddle_right_position.y;
-    
-                paddle_left_score = 0;
-                paddle_right_score = 0;
-    
-                pause = 0;
-
-                spawn_delay = SPAWN_DELAY;
             }
         }
 
@@ -248,40 +340,21 @@ int main(void)
             DrawRectangleRec(paddle_right, WHITE);
             DrawRectangleRec(paddle_left, WHITE);
 
-            DrawRectangleRec(AIDetectRecUpAiQuadrant, BLANK);
-            DrawRectangleRec(AIDetectRecDownAiQuadrant, BLANK);
-            DrawRectangleRec(AIDetectRecUpPlayerQuadrant, BLANK);
-            DrawRectangleRec(AIDetectRecDownPlayerQuadrant, BLANK);
+            if (game_mode_selected == AI)
+            {
+                DrawRectangleRec(AIDetectRecUpAiQuadrant, BLANK);
+                DrawRectangleRec(AIDetectRecDownAiQuadrant, BLANK);
+                DrawRectangleRec(AIDetectRecUpPlayerQuadrant, BLANK);
+                DrawRectangleRec(AIDetectRecDownPlayerQuadrant, BLANK);
+            }
 
             DrawLine(GetScreenWidth() / 2, 0, GetScreenWidth() / 2, GetScreenHeight(), WHITE);
-
-            DrawText(TextFormat("%00i", paddle_left_score), GetScreenWidth() / 2 - 18 + PADDING_TEXT, PADDING_TEXT * 0.5, 72, WHITE);
-            DrawText(TextFormat("%00i", paddle_right_score), GetScreenWidth() / 2 - 18 - PADDING_TEXT, PADDING_TEXT * 0.5, 72, WHITE);
             
             DrawText(get_game_mode(game_mode_selected), 0 , 0, 32, WHITE);
 
-            DrawLine(GetScreenWidth() / 2, 0, GetScreenWidth() / 2, GetScreenHeight(), WHITE);
+            show_score();
 
-            if (pause == 1) {
-                ClearBackground(WHITE);
-
-                for(int i = 0; i < MENU_ITEMS_LENGTH; ++i) {
-                    DrawText(menu_items[i], GetScreenWidth() / 3 - PADDING_TEXT * 3, GetScreenHeight() / 2 + PADDING_TEXT * i + 3, 32, BLACK);
-                }
-
-                if (IsKeyDown(KEY_KP_1)) {
-                    game_mode_selected = AI;
-                    pause = 0;
-                } else if (IsKeyDown(KEY_KP_2)) {
-                    game_mode_selected = LOCAL;
-                    pause = 0;
-                } else if (IsKeyDown(KEY_KP_3)) {
-                    game_mode_selected = ONLINE;
-                    pause = 0;
-                }
-
-                DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
-            }
+            show_menu();
 
             if (spawn_delay >= 0 && pause == 0) {
                 DrawText(TextFormat("%00i", spawn_delay / 60), GetScreenWidth() / 2, GetScreenHeight() / 2 + PADDING_TEXT * 2, 42, WHITE);
