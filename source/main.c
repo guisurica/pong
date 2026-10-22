@@ -457,14 +457,14 @@ int main(void)
                 {
                     ball_speed.x = -ball_v_x;
                     player_paddle_touched = 0;
-                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]);
+                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]); // melhorar isso
                 }
         
                 if (paddle_left_collision == 1)
                 {
                     ball_speed.x = ball_v_x * 8;
                     player_paddle_touched = 1;
-                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]);
+                    PlaySound(soundArray[rand() % (2 - 1 + 1) + 1]); // melhorar isso
                 }
 
                 if (game_mode_selected == AI) 
