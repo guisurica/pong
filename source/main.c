@@ -338,7 +338,7 @@ char *get_ai_matchup(enum AI_MATCH_MODE mode)
     switch(mode) 
     {
         case INFINITE: return "Partida infinita";
-        case LIMITED: return "Partida limitada: 10 pontos";
+        case LIMITED: return "Partida limitada: 3 pontos";
         default: return "Partida infinita";
     }
 }
