@@ -17,6 +17,7 @@
 #define AI_QUADRANT_MULTPLIER 3
 #define PLAYER_QUADRANT_MULTIPLIER 1
 #define MENU_ITEMS_LENGTH 3
+#define AI_MATCHUP_ITEMS_LENGTH 3
 #define SOUNDS 5
 
 Vector2 ball_position = { SCREEN_WIDTH/2 - BALL_SIZE / 2, SCREEN_HEIGHT / 2 };
@@ -35,17 +36,38 @@ struct Rectangle AIDetectRecDownAiQuadrant = {0};
 struct Rectangle AIDetectRecUpPlayerQuadrant = {0};
 struct Rectangle AIDetectRecDownPlayerQuadrant = {0};
 
-enum GAME_MODE {
+enum MENU_LAYER 
+{
+    ML_MAIN,
+    ML_AI_MATCHUP
+};
+
+enum GAME_MODE 
+{
     AI,
     LOCAL,
     ONLINE
 };
+
+enum AI_MATCH_MODE
+{
+    INFINITE,
+    LIMITED
+};
  
 // TODO: Implementar modo de jogo online
-char *items[] = {
+char *items[] = 
+{
     "Você vs IA [1]",
     "Você vs jogador (local) [2]",
     "Você vs jogador (online) [Em desenvolvimento!] [3]",
+};
+
+char *ai_matchup_items[] = 
+{
+    "Tipo de partida: Infinito [1]",
+    "Tipo de partida: Limitada [2]",
+    "Voltar [3]"
 };
 
 char **menu_items = items;
@@ -53,10 +75,16 @@ char **menu_items = items;
 int paddle_left_score = 0;
 int paddle_right_score = 0;
 int pause = 1;
+int match_ended = 0;
+struct Rectangle *winner = NULL;
 int player_paddle_touched = 1;
 int spawn_delay = SPAWN_DELAY;
+
 enum GAME_MODE game_mode_selected = AI;
-Sound soundArray[SOUNDS] = { 0 };
+enum AI_MATCH_MODE ai_match_up_mode = INFINITE;
+enum MENU_LAYER menu_layer = ML_MAIN;
+
+Sound soundArray[SOUNDS] = {0};
 
 static void load_sounds_array() 
 {
@@ -67,36 +95,131 @@ static void load_sounds_array()
     soundArray[4] = LoadSound("assets/sounds/scoring.wav");
 }
 
-static void show_menu() 
+static void restart()
 {
-    if (pause == 1) 
+    ball.x = ball_position.x;
+    ball.y = ball_position.y;
+
+    paddle_left.y = paddle_left_position.y;
+    paddle_right.y = paddle_right_position.y;
+
+    paddle_left_score = 0;
+    paddle_right_score = 0;
+
+    pause = 0;
+
+    spawn_delay = SPAWN_DELAY;
+
+    match_ended = 0;
+    winner = NULL;
+}
+
+static void draw_menu_options(char **list_items, int total_items)
+{
+    for(int i = 0; i < total_items; ++i) 
     {
-        ClearBackground(WHITE);
+        DrawText(list_items[i], GetScreenWidth() / 3 - PADDING_TEXT * 3, GetScreenHeight() / 2 + PADDING_TEXT * i + 3, 32, BLACK);
+    }
+}
 
-        for(int i = 0; i < MENU_ITEMS_LENGTH; ++i) 
-        {
-            DrawText(menu_items[i], GetScreenWidth() / 3 - PADDING_TEXT * 3, GetScreenHeight() / 2 + PADDING_TEXT * i + 3, 32, BLACK);
-        }
+static void show_ml_main_menu()
+{
+    draw_menu_options(menu_items, MENU_ITEMS_LENGTH);
 
-        if (IsKeyDown(KEY_KP_1)) 
+    if (IsKeyDown(KEY_KP_1)) 
+    {
+        game_mode_selected = AI;
+        PlaySound(soundArray[0]);
+        pause = 1;
+        menu_layer = ML_AI_MATCHUP;
+
+        WaitTime(0.5); // melhorar isso
+    } 
+    else if (IsKeyDown(KEY_KP_2)) 
+    {
+        game_mode_selected = LOCAL;
+        PlaySound(soundArray[0]);
+        pause = 0;
+
+        WaitTime(0.5);
+    } 
+    else if (IsKeyDown(KEY_KP_3)) 
+    {
+        game_mode_selected = ONLINE;
+        PlaySound(soundArray[0]);
+    }
+
+    DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
+}
+
+static void show_ml_ai_matchup_menu() 
+{
+    draw_menu_options(ai_matchup_items, AI_MATCHUP_ITEMS_LENGTH);
+
+    if (IsKeyDown(KEY_KP_1)) 
+    {
+        ai_match_up_mode = INFINITE;
+        PlaySound(soundArray[0]);
+        pause = 0;
+
+        WaitTime(0.5);
+    }
+    else if (IsKeyDown(KEY_KP_2)) 
+    {
+        ai_match_up_mode = LIMITED;
+        PlaySound(soundArray[0]);
+        pause = 0;
+
+        WaitTime(0.5);
+    } 
+    else if (IsKeyDown(KEY_KP_3)) 
+    {
+        PlaySound(soundArray[0]);
+        menu_layer = ML_MAIN;
+
+        WaitTime(0.5);
+    }
+}
+
+static void show_ended_match_menu(struct Rectangle *pWinner) 
+{
+    if (pWinner == NULL) return;
+
+    ClearBackground(WHITE);
+
+    DrawText("Partida finalizada", GetScreenWidth() / 3, GetScreenHeight() / 3, 32, BLACK);
+    
+    if (game_mode_selected == AI) 
+    {
+        if (pWinner == &paddle_left) 
         {
-            game_mode_selected = AI;
-            PlaySound(soundArray[0]);
-            pause = 0;
+            DrawText("Jogador venceu", GetScreenWidth() / 3, GetScreenHeight() / 3 + BALL_SIZE, 32, BLACK);
         } 
-        else if (IsKeyDown(KEY_KP_2)) 
+        else if (pWinner == &paddle_right)
         {
-            game_mode_selected = LOCAL;
-            PlaySound(soundArray[0]);
-            pause = 0;
-        } 
-        else if (IsKeyDown(KEY_KP_3)) 
-        {
-            game_mode_selected = ONLINE;
-            PlaySound(soundArray[0]);
+            DrawText("IA venceu", GetScreenWidth() / 3, GetScreenHeight() / 3 + BALL_SIZE, 32, BLACK);
         }
+    }
 
-        DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
+    if (match_ended == 1 && IsKeyDown(KEY_R)) 
+    {
+        restart();
+    }
+
+    DrawText("Aperte r para reiniciar", GetScreenWidth() / 2 - PADDING_TEXT * 3, GetScreenHeight() - PADDING_TEXT, 42, BLACK);
+}
+
+static void show_menu() // futuramente tirar isso, menu não precisa saber vencedor
+{
+    ClearBackground(WHITE);
+
+    if (menu_layer == ML_MAIN) 
+    {
+        show_ml_main_menu();
+    }
+    else if (menu_layer == ML_AI_MATCHUP) 
+    {
+        show_ml_ai_matchup_menu();
     }
 }
 
@@ -169,6 +292,36 @@ static void bounce_ball(float current_ball_position, int screen_height,
     }
 }
 
+static void doPause() 
+{
+    if (IsKeyPressed(KEY_SPACE) && pause == 0) 
+    {
+        pause = 1;
+        menu_layer = ML_MAIN;
+    } 
+    else if (IsKeyPressed(KEY_SPACE) && pause == 1) 
+    {
+        pause = 0;
+        menu_layer = ML_MAIN;
+    }
+}
+
+static void force_stop()
+{
+    ball.x = ball_position.x;
+    ball.y = ball_position.y;
+
+    paddle_left.y = paddle_left_position.y;
+    paddle_right.y = paddle_right_position.y;
+
+    paddle_left_score = 0;
+    paddle_right_score = 0;
+
+    pause = 0;
+
+    spawn_delay = SPAWN_DELAY;
+}
+
 char *get_game_mode(enum GAME_MODE mode) 
 {
     switch(mode) 
@@ -178,7 +331,16 @@ char *get_game_mode(enum GAME_MODE mode)
         case ONLINE: return "online";
         default: return "Contra IA";
     }
+}
 
+char *get_ai_matchup(enum AI_MATCH_MODE mode) 
+{
+    switch(mode) 
+    {
+        case INFINITE: return "Partida infinita";
+        case LIMITED: return "Partida limitada: 10 pontos";
+        default: return "Partida infinita";
+    }
 }
 
 int main(void) 
@@ -227,19 +389,13 @@ int main(void)
     SetTargetFPS(60);
 
     while(!WindowShouldClose()) {
+
         if (pause == 0) 
         {
             spawn_delay -= 1;
         }
 
-        if (IsKeyPressed(KEY_SPACE) && pause == 0) 
-        {
-            pause = 1;
-        } 
-        else if (IsKeyPressed(KEY_SPACE) && pause == 1) 
-        {
-            pause = 0;
-        }
+        doPause();
 
         if (pause == 1 && IsKeyPressed(KEY_R)) 
         {
@@ -313,6 +469,18 @@ int main(void)
 
                 if (game_mode_selected == AI) 
                 {
+                    if (ai_match_up_mode == LIMITED && paddle_right_score >= 3) 
+                    {
+                        match_ended = 1;
+                        winner = &paddle_left;
+                    }
+
+                    if (ai_match_up_mode == LIMITED && paddle_left_score >= 3) 
+                    {
+                        match_ended = 1;
+                        winner = &paddle_right;
+                    }
+
                     int detect_collision_upaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecUpAiQuadrant);
                     int detect_collision_downaward_ai_quadrant = CheckCollisionRecs(ball, AIDetectRecDownAiQuadrant);
                     int detect_collision_upaward_player_quadrant = CheckCollisionRecs(ball, AIDetectRecUpPlayerQuadrant);
@@ -371,9 +539,20 @@ int main(void)
             
             DrawText(get_game_mode(game_mode_selected), 0 , 0, 32, WHITE);
 
+            DrawText(get_ai_matchup(ai_match_up_mode), 0 , BALL_SIZE, 32, WHITE);
+
             show_score();
 
-            show_menu();
+            if (match_ended == 1) 
+            {
+                force_stop();
+                show_ended_match_menu(winner);
+            }
+
+            if (pause == 1)
+            {
+                show_menu();
+            }
 
             if (spawn_delay >= 0 && pause == 0) {
                 DrawText(TextFormat("%00i", spawn_delay / 60), GetScreenWidth() / 2, GetScreenHeight() / 2 + PADDING_TEXT * 2, 42, WHITE);
